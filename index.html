@@ -66,10 +66,14 @@
             </div>
             <div class="plan-field plan-field-duration">
                 <span class="plan-field-label">Plan length</span>
-                <div id="duration-pills" class="duration-pills" role="group" aria-label="Plan length in days">
-                    <button type="button" class="duration-pill" data-duration="30" aria-pressed="true">30 days</button>
-                    <button type="button" class="duration-pill" data-duration="60" aria-pressed="false">60 days</button>
-                    <button type="button" class="duration-pill" data-duration="90" aria-pressed="false">90 days</button>
+                
+                <div class="plan-duration-control">
+                    <div class="khatmah-input-group flex items-center rounded-lg overflow-hidden border border-slate-600">
+                        <button id="custom-duration-minus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 flex items-center justify-center font-bold" aria-label="Decrease plan length by 1 day">−</button>
+                        <span id="custom-duration-display" class="khatmah-value w-14 text-center bg-slate-800/50 text-lg font-semibold py-2 text-cmu-gold" aria-live="polite">30</span>
+                        <button id="custom-duration-plus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 flex items-center justify-center font-bold" aria-label="Increase plan length by 1 day">+</button>
+                    </div>
+                    <span class="plan-duration-unit">days</span>
                 </div>
             </div>
         </div>

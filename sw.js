@@ -2,7 +2,7 @@
  * Khatmah - Service Worker
  * Caches app shell for offline use and faster repeat loads.
  */
-const CACHE_NAME = 'khatmah-v7';
+const CACHE_NAME = 'khatmah-v8';
 const ASSETS = [
   'index.html',
   'styles.css',

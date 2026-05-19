@@ -8,7 +8,8 @@ const JUZ_PER_KHATMAH = 30;
 const RAMADAN_DAYS = 30;
 const PAGES_IN_QURAN = 604;
 const RAMADAN_MONTH = 9;
-const CUSTOM_DURATIONS = [30, 60, 90];
+const MIN_CUSTOM_DAYS = 1;
+const MAX_CUSTOM_DAYS = 365;
 
 const JUZ_PAGE_START = [
     1, 22, 42, 62, 82, 102, 121, 142, 162, 182,
@@ -52,7 +53,8 @@ let dayStepperLabel, hijriDayDisplay, hijriMinus, hijriPlus;
 let khatmahInput, khatmahMinus, khatmahPlus;
 let outsideBanner, headerSubtitle;
 let modeRamadanBtn, modeCustomBtn, customPanel, customStartInput, customFinishBy;
-let dayStepperRow, controlsBar, durationPills, customPlanStatus;
+let dayStepperRow, controlsBar, customPlanStatus;
+let customDurationDisplay, customDurationMinus, customDurationPlus;
 
 /* ============ HIJRI DATE ============ */
 function getHijriDate(date = new Date()) {
@@ -285,8 +287,7 @@ function loadState() {
 
         const dur = localStorage.getItem(STORAGE_KEYS.customDuration);
         if (dur != null) {
-            const d = parseInt(dur, 10);
-            if (CUSTOM_DURATIONS.includes(d)) appState.customDurationDays = d;
+            appState.customDurationDays = clampCustomDuration(parseInt(dur, 10));
         }
 
         const hijri = getHijriDate();
@@ -361,9 +362,18 @@ function setCustomStartDate(iso) {
     scrollToDay(currentDay);
 }
 
+function clampCustomDuration(days) {
+    return Math.max(MIN_CUSTOM_DAYS, Math.min(MAX_CUSTOM_DAYS, days));
+}
+
+function adjustCustomDuration(delta) {
+    setCustomDuration(appState.customDurationDays + delta);
+}
+
 function setCustomDuration(days) {
-    if (!CUSTOM_DURATIONS.includes(days)) return;
-    appState.customDurationDays = days;
+    const next = clampCustomDuration(days);
+    if (next === appState.customDurationDays) return;
+    appState.customDurationDays = next;
     appState.customDayOverride = null;
     loadCompletedDays();
     updateCurrentDay();
@@ -446,12 +456,9 @@ function renderControls() {
     if (!isRamadanMode()) {
         customStartInput.value = appState.customStartDate;
         customFinishBy.textContent = formatFinishDate();
-        durationPills.forEach((pill) => {
-            const d = parseInt(pill.dataset.duration, 10);
-            const active = d === appState.customDurationDays;
-            pill.classList.toggle('duration-pill-active', active);
-            pill.setAttribute('aria-pressed', String(active));
-        });
+        customDurationDisplay.textContent = appState.customDurationDays;
+        customDurationMinus.disabled = appState.customDurationDays <= MIN_CUSTOM_DAYS;
+        customDurationPlus.disabled = appState.customDurationDays >= MAX_CUSTOM_DAYS;
     }
 
     const showRamadanBanner = isRamadanMode() && !inRamadan;
@@ -638,7 +645,9 @@ function init() {
     customPlanStatus = document.getElementById('custom-plan-status');
     dayStepperRow = document.getElementById('day-stepper-row');
     controlsBar = document.querySelector('.controls-bar');
-    durationPills = document.querySelectorAll('.duration-pill');
+    customDurationDisplay = document.getElementById('custom-duration-display');
+    customDurationMinus = document.getElementById('custom-duration-minus');
+    customDurationPlus = document.getElementById('custom-duration-plus');
 
     loadState();
     updateCurrentDay();
@@ -651,11 +660,8 @@ function init() {
     khatmahMinus.addEventListener('click', () => setTargetKhatmahs(appState.targetKhatmahs - 1));
     khatmahPlus.addEventListener('click', () => setTargetKhatmahs(appState.targetKhatmahs + 1));
     customStartInput.addEventListener('change', (e) => setCustomStartDate(e.target.value));
-    durationPills.forEach((pill) => {
-        pill.addEventListener('click', () => {
-            setCustomDuration(parseInt(pill.dataset.duration, 10));
-        });
-    });
+    customDurationMinus.addEventListener('click', () => adjustCustomDuration(-1));
+    customDurationPlus.addEventListener('click', () => adjustCustomDuration(1));
 
     setupDragScroll();
     setupKeyboardNav();

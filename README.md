@@ -7,7 +7,7 @@ A Quran reading companion for the **CMU-Q Muslim Student Association**. Plan you
 
 ## Features
 
-* **Dual schedule modes:** **Ramadan plan** (30-day Ramadan schedule with Hijri detection) or **My schedule** (custom start date and 30/60/90-day plans).
+* **Dual schedule modes:** **Ramadan plan** (30-day Ramadan schedule with Hijri detection) or **My schedule** (custom start date and any plan length from 1–365 days).
 * **Dynamic scheduling:** Enter how many khatmahs you want to complete; the app distributes juz' and page ranges evenly across your plan length.
 * **Hijri date detection:** Uses `Intl.DateTimeFormat` (islamic-umalqura) to detect the current Ramadan day and show a year-round countdown to the next Ramadan.
 * **Plan day preview:** Outside Ramadan, browse and track progress against the 30-day Ramadan plan with a manual plan-day highlight.

@@ -1,7 +1,7 @@
 {
   "name": "Khatmah | CMU-Q MSA",
   "short_name": "Khatmah",
-  "description": "Ramadan reading companion. Plan your khatmah with daily juz' and page targets.",
+  "description": "Quran reading companion for Ramadan and year-round custom plans. Daily juz' and page targets.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

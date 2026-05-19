@@ -2,7 +2,7 @@
  * Khatmah - Service Worker
  * Caches app shell for offline use and faster repeat loads.
  */
-const CACHE_NAME = 'khatmah-v5';
+const CACHE_NAME = 'khatmah-v7';
 const ASSETS = [
   'index.html',
   'styles.css',
@@ -32,7 +32,16 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return;
 
   const cacheKey = e.request.mode === 'navigate' ? 'index.html' : e.request;
+
   e.respondWith(
-    caches.match(cacheKey).then((cached) => cached || fetch(e.request))
+    fetch(e.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(cacheKey, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(cacheKey))
   );
 });

@@ -31,10 +31,19 @@
     <header class="text-center py-5 border-b border-slate-700/50">
         <img src="khatmah_logo.png" alt="Khatmah - CMU-Q MSA" class="w-20 h-20 mx-auto mb-2 rounded-2xl object-contain">
         <h1 class="text-xl font-bold text-slate-100">Khatmah</h1>
-        <p class="text-sm text-slate-500 mt-1">Finish the Quran this Ramadan</p>
+        <p id="header-subtitle" class="text-sm text-slate-500 mt-1">Finish the Quran this Ramadan</p>
     </header>
 
-    <!-- Progress Bar (state-driven, never read from DOM) -->
+    <!-- Mode toggle -->
+    
+    <div class="flex justify-center px-4 py-3 border-b border-slate-700/30">
+        <div id="mode-toggle" class="mode-toggle" role="group" aria-label="Schedule mode">
+            <button id="mode-ramadan" type="button" class="mode-toggle-btn mode-toggle-active" aria-pressed="true">Ramadan plan</button>
+            <button id="mode-custom" type="button" class="mode-toggle-btn" aria-pressed="false">My schedule</button>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
     <div class="sticky top-0 z-20 glass-bar border-b border-slate-700/30 px-4 py-3 safe-area-top">
         <div class="max-w-2xl mx-auto flex items-center justify-between gap-4">
             <div class="flex items-center gap-3">
@@ -47,13 +56,37 @@
         </div>
     </div>
 
-    <!-- Hijri Offset + Khatmahs Controls -->
-    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 py-4 px-4 border-b border-slate-700/30">
-        <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-500 uppercase tracking-wider">Hijri day</span>
-            <button id="hijri-minus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg flex items-center justify-center font-bold text-lg" aria-label="Decrease Hijri day by 1">−</button>
+    <!-- My schedule: plan settings -->
+    <section id="custom-panel" class="hidden plan-settings" aria-label="Plan settings">
+        <p class="plan-settings-title">Your reading plan</p>
+        <div class="plan-settings-grid">
+            <div class="plan-field plan-field-date">
+                <label for="custom-start-date" class="plan-field-label">Start date</label>
+                <input id="custom-start-date" type="date" class="plan-date-input">
+            </div>
+            <div class="plan-field plan-field-duration">
+                <span class="plan-field-label">Plan length</span>
+                <div id="duration-pills" class="duration-pills" role="group" aria-label="Plan length in days">
+                    <button type="button" class="duration-pill" data-duration="30" aria-pressed="true">30 days</button>
+                    <button type="button" class="duration-pill" data-duration="60" aria-pressed="false">60 days</button>
+                    <button type="button" class="duration-pill" data-duration="90" aria-pressed="false">90 days</button>
+                </div>
+            </div>
+        </div>
+        <p id="custom-plan-status" class="plan-status hidden" role="status"></p>
+        <div class="plan-finish-row">
+            <span class="plan-finish-label">Complete by</span>
+            <span id="custom-finish-by" class="plan-finish-date">—</span>
+        </div>
+    </section>
+
+    <!-- Controls: day stepper (Ramadan) + khatmahs -->
+    <div class="controls-bar flex flex-col sm:flex-row items-center justify-center gap-4 py-4 px-4 border-b border-slate-700/30">
+        <div id="day-stepper-row" class="flex items-center gap-2">
+            <span id="day-stepper-label" class="text-xs text-slate-500 uppercase tracking-wider">Plan day</span>
+            <button id="hijri-minus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg flex items-center justify-center font-bold text-lg" aria-label="Decrease day by 1">−</button>
             <span id="hijri-day-display" class="text-sm font-semibold w-8 text-center text-cmu-gold">1</span>
-            <button id="hijri-plus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg flex items-center justify-center font-bold text-lg" aria-label="Increase Hijri day by 1">+</button>
+            <button id="hijri-plus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg flex items-center justify-center font-bold text-lg" aria-label="Increase day by 1">+</button>
         </div>
         <div class="flex items-center gap-2">
             <span class="text-xs text-slate-500 uppercase tracking-wider">Khatmahs</span>
@@ -71,7 +104,7 @@
     </div>
 
     <!-- Carousel -->
-    <main id="carousel" class="flex-1 overflow-x-auto overflow-y-hidden carousel-container" role="region" aria-roledescription="carousel" aria-label="Ramadan daily reading schedule" tabindex="0">
+    <main id="carousel" class="flex-1 overflow-x-auto overflow-y-hidden carousel-container" role="region" aria-roledescription="carousel" aria-label="Daily reading schedule" tabindex="0">
         <div id="carousel-inner" class="carousel-inner">
             <!-- Cards rendered by app.js -->
         </div>

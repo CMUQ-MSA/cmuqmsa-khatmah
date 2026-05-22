@@ -37,6 +37,18 @@ Then visit [http://localhost:8085](http://localhost:8085).
 
 **VS Code:** Use the "Live Server" extension and open with Live Server.
 
+## Production
+
+This app is intended to run at **khatmah.cmuqmsa.org**.
+
+Build the production container:
+
+```bash
+docker build -t cmuqmsa-khatmah .
+```
+
+The container serves static files on internal port `80`. In production, the central `cmuqmsa-infra` Caddy router sends `khatmah.cmuqmsa.org` traffic to this container.
+
 ## Install as Web App
 
 1. Serve over **HTTPS** (or localhost for testing).

@@ -1,9 +1,7 @@
 services:
   khatmah:
-    image: nginx:alpine
+    build: .
     container_name: khatmah_app
     restart: unless-stopped
     ports:
       - "8085:80"
-    volumes:
-      - ./:/usr/share/nginx/html:ro

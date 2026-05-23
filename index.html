@@ -7,36 +7,22 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Khatmah | CMU-Q MSA</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-                    colors: {
-                        'cmu-red': '#C41230',
-                        'cmu-gold': '#F2A900',
-                    }
-                }
-            }
-        }
-    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col antialiased safe-area-padding">
+<body class="app-body safe-area-padding">
     <!-- Header -->
-    <header class="text-center py-5 border-b border-slate-700/50">
-        <img src="khatmah_logo.png" alt="Khatmah - CMU-Q MSA" class="w-20 h-20 mx-auto mb-2 rounded-2xl object-contain">
-        <h1 class="text-xl font-bold text-slate-100">Khatmah</h1>
-        <p id="header-subtitle" class="text-sm text-slate-500 mt-1">Finish the Quran this Ramadan</p>
+    <header class="app-header">
+        <img src="khatmah_logo.png" alt="Khatmah - CMU-Q MSA" class="app-logo">
+        <h1 class="app-title">Khatmah</h1>
+        <p id="header-subtitle" class="app-subtitle">Finish the Quran this Ramadan</p>
     </header>
 
     <!-- Mode toggle -->
     
-    <div class="flex justify-center px-4 py-3 border-b border-slate-700/30">
+    <div class="mode-toggle-row">
         <div id="mode-toggle" class="mode-toggle" role="group" aria-label="Schedule mode">
             <button id="mode-ramadan" type="button" class="mode-toggle-btn mode-toggle-active" aria-pressed="true">Ramadan plan</button>
             <button id="mode-custom" type="button" class="mode-toggle-btn" aria-pressed="false">My schedule</button>
@@ -44,14 +30,14 @@
     </div>
 
     <!-- Progress Bar -->
-    <div class="sticky top-0 z-20 glass-bar border-b border-slate-700/30 px-4 py-3 safe-area-top">
-        <div class="max-w-2xl mx-auto flex items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <span id="progress-text" class="text-sm font-medium text-slate-300">Day 1 of 30</span>
-                <span id="progress-completed" class="text-xs text-slate-500">0 completed</span>
+    <div class="progress-shell glass-bar safe-area-top">
+        <div class="progress-content">
+            <div class="progress-labels">
+                <span id="progress-text" class="progress-text">Day 1 of 30</span>
+                <span id="progress-completed" class="progress-completed">0 completed</span>
             </div>
-            <div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div id="progress-bar-fill" class="h-full bg-gradient-to-r from-cmu-red to-cmu-gold rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+            <div class="progress-track">
+                <div id="progress-bar-fill" class="progress-fill" style="width: 0%"></div>
             </div>
         </div>
     </div>
@@ -68,10 +54,10 @@
                 <span class="plan-field-label">Plan length</span>
                 
                 <div class="plan-duration-control">
-                    <div class="khatmah-input-group flex items-center rounded-lg overflow-hidden border border-slate-600">
-                        <button id="custom-duration-minus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 flex items-center justify-center font-bold" aria-label="Decrease plan length by 1 day">−</button>
-                        <span id="custom-duration-display" class="khatmah-value w-14 text-center bg-slate-800/50 text-lg font-semibold py-2 text-cmu-gold" aria-live="polite">30</span>
-                        <button id="custom-duration-plus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 flex items-center justify-center font-bold" aria-label="Increase plan length by 1 day">+</button>
+                    <div class="khatmah-input-group">
+                        <button id="custom-duration-minus" type="button" class="khatmah-btn khatmah-btn-touch stepper-btn" aria-label="Decrease plan length by 1 day">−</button>
+                        <span id="custom-duration-display" class="khatmah-value duration-value" aria-live="polite">30</span>
+                        <button id="custom-duration-plus" type="button" class="khatmah-btn khatmah-btn-touch stepper-btn" aria-label="Increase plan length by 1 day">+</button>
                     </div>
                     <span class="plan-duration-unit">days</span>
                 </div>
@@ -85,37 +71,37 @@
     </section>
 
     <!-- Controls: day stepper (Ramadan) + khatmahs -->
-    <div class="controls-bar flex flex-col sm:flex-row items-center justify-center gap-4 py-4 px-4 border-b border-slate-700/30">
-        <div id="day-stepper-row" class="flex items-center gap-2">
-            <span id="day-stepper-label" class="text-xs text-slate-500 uppercase tracking-wider">Plan day</span>
-            <button id="hijri-minus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg flex items-center justify-center font-bold text-lg" aria-label="Decrease day by 1">−</button>
-            <span id="hijri-day-display" class="text-sm font-semibold w-8 text-center text-cmu-gold">1</span>
-            <button id="hijri-plus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg flex items-center justify-center font-bold text-lg" aria-label="Increase day by 1">+</button>
+    <div class="controls-bar">
+        <div id="day-stepper-row" class="control-row">
+            <span id="day-stepper-label" class="control-label">Plan day</span>
+            <button id="hijri-minus" type="button" class="khatmah-btn khatmah-btn-touch stepper-btn touch-stepper" aria-label="Decrease day by 1">−</button>
+            <span id="hijri-day-display" class="day-display">1</span>
+            <button id="hijri-plus" type="button" class="khatmah-btn khatmah-btn-touch stepper-btn touch-stepper" aria-label="Increase day by 1">+</button>
         </div>
-        <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-500 uppercase tracking-wider">Khatmahs</span>
-            <div class="khatmah-input-group flex items-center rounded-lg overflow-hidden border border-slate-600">
-                <button id="khatmah-minus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center font-bold" aria-label="Decrease khatmahs">−</button>
-                <span id="khatmah-input" class="khatmah-value w-12 text-center bg-slate-800/50 text-lg font-semibold py-2" aria-live="polite">1</span>
-                <button id="khatmah-plus" type="button" class="khatmah-btn khatmah-btn-touch w-9 h-9 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center font-bold" aria-label="Increase khatmahs">+</button>
+        <div class="control-row">
+            <span class="control-label">Khatmahs</span>
+            <div class="khatmah-input-group">
+                <button id="khatmah-minus" type="button" class="khatmah-btn khatmah-btn-touch stepper-btn touch-stepper" aria-label="Decrease khatmahs">−</button>
+                <span id="khatmah-input" class="khatmah-value khatmah-count-value" aria-live="polite">1</span>
+                <button id="khatmah-plus" type="button" class="khatmah-btn khatmah-btn-touch stepper-btn touch-stepper" aria-label="Increase khatmahs">+</button>
             </div>
         </div>
     </div>
 
     <!-- Outside Ramadan Banner -->
-    <div id="outside-ramadan-banner" class="hidden mx-4 mt-3 p-3 rounded-xl glass-card border border-amber-600/30 text-amber-200 text-sm text-center">
+    <div id="outside-ramadan-banner" class="hidden ramadan-banner glass-card">
         Ramadan is approaching.
     </div>
 
     <!-- Carousel -->
-    <main id="carousel" class="flex-1 overflow-x-auto overflow-y-hidden carousel-container" role="region" aria-roledescription="carousel" aria-label="Daily reading schedule" tabindex="0">
+    <main id="carousel" class="carousel-container" role="region" aria-roledescription="carousel" aria-label="Daily reading schedule" tabindex="0">
         <div id="carousel-inner" class="carousel-inner">
             <!-- Cards rendered by app.js -->
         </div>
     </main>
 
     <!-- Footer -->
-    <footer class="py-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-slate-500 text-sm border-t border-slate-700/30">
+    <footer class="app-footer">
         <p>CMU-Q Muslim Student Association</p>
     </footer>
 

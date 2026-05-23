@@ -1,7 +1,19 @@
+# LEGACY STANDALONE COMPOSE — DO NOT USE FOR PRODUCTION
+#
+# This file is for local debugging of cmuqmsa-khatmah by itself only.
+# Production deployment is managed from the cmuqmsa-infra repository
+# (https://github.com/CMUQ-MSA/cmuqmsa-infra).
+#
+# Do not run this on the server unless you are intentionally debugging
+# this app in isolation. It publishes host port 8085 and is not wired through
+# Caddy; running it alongside unified infra can confuse operators and port checks.
+#
+# See cmuqmsa-infra/docs/runbook.md for the supported deployment flow.
+
 services:
   khatmah:
     build: .
     container_name: khatmah_app
     restart: unless-stopped
     ports:
-      - "8085:80"
+      - "8085:8080"

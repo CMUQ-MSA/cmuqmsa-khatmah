@@ -14,11 +14,11 @@ A Quran reading companion for the **CMU-Q Muslim Student Association**. Plan you
 * **Hijri offset:** During Ramadan, adjust +/- for local moon sighting differences.
 * **Mark as done:** Tap a day card to mark it complete. Progress persists in `localStorage` (separate keys per Ramadan year and per custom plan).
 * **Horizontal carousel:** Swipe or drag through days; auto-scrolls to the current day on load.
-* **Installable:** Add to home screen as a web app (PWA). Works offline after first visit.
+* **Installable:** Add to home screen as a web app (PWA). Core app files work offline after first visit.
 
 ## Tech Stack
 
-* **Frontend:** HTML5, Tailwind CSS (CDN), Vanilla JavaScript
+* **Frontend:** HTML5, CSS3, Vanilla JavaScript
 * **No build step:** Static files only
 * **PWA:** Web app manifest, service worker, offline caching
 
@@ -29,9 +29,11 @@ A Quran reading companion for the **CMU-Q Muslim Student Association**. Plan you
 
 ```bash
 python -m http.server 8085
-# or
+# or (legacy standalone compose — not for production; see cmuqmsa-infra)
 docker compose up
 ```
+
+> **Production:** Deploy **khatmah.cmuqmsa.org** from [cmuqmsa-infra](https://github.com/CMUQ-MSA/cmuqmsa-infra). Do not run this repo’s `docker-compose.yml` on the server; it publishes port `8085` and bypasses Caddy.
 
 Then visit [http://localhost:8085](http://localhost:8085).
 
@@ -47,7 +49,13 @@ Build the production container:
 docker build -t cmuqmsa-khatmah .
 ```
 
-The container serves static files on internal port `80`. In production, the central `cmuqmsa-infra` Caddy router sends `khatmah.cmuqmsa.org` traffic to this container.
+The container serves static files on internal port `8080`. In production, the central `cmuqmsa-infra` Caddy router sends `khatmah.cmuqmsa.org` traffic to this container.
+
+Health endpoint:
+
+```bash
+curl http://localhost:8080/healthz
+```
 
 ## Install as Web App
 
@@ -58,8 +66,8 @@ The container serves static files on internal port `80`. In production, the cent
 ## Project Structure
 
 ```
-├── index.html    # Semantic HTML + Tailwind
-├── styles.css    # Custom overrides, glassmorphism, mode toggle
+├── index.html    # Semantic HTML
+├── styles.css    # App styles, glassmorphism, mode toggle
 ├── app.js        # State management, Hijri logic, dual modes, render
 ├── sw.js         # Service worker (offline caching)
 ├── manifest.json # Web app manifest

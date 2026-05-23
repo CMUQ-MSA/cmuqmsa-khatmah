@@ -29,19 +29,15 @@ A Quran reading companion for the **CMU-Q Muslim Student Association**. Plan you
 
 ```bash
 python -m http.server 8085
-# or (legacy standalone compose — not for production; see cmuqmsa-infra)
+# or
 docker compose up
 ```
 
-> **Production:** Deploy **khatmah.cmuqmsa.org** from [cmuqmsa-infra](https://github.com/CMUQ-MSA/cmuqmsa-infra). Do not run this repo’s `docker-compose.yml` on the server; it publishes port `8085` and bypasses Caddy.
-
-Then visit [http://localhost:8085](http://localhost:8085).
+Then visit [http://localhost:8085](http://localhost:8085) (compose maps host port 8085 to container 8080).
 
 **VS Code:** Use the "Live Server" extension and open with Live Server.
 
 ## Production
-
-This app is intended to run at **khatmah.cmuqmsa.org**.
 
 Build the production container:
 
@@ -49,7 +45,7 @@ Build the production container:
 docker build -t cmuqmsa-khatmah .
 ```
 
-The container serves static files on internal port `8080`. In production, the central `cmuqmsa-infra` Caddy router sends `khatmah.cmuqmsa.org` traffic to this container.
+The container serves static files on port **8080** inside the container. Use a reverse proxy in front for HTTPS and your public hostname.
 
 Health endpoint:
 

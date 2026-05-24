@@ -3,7 +3,7 @@
 ![App Status](https://img.shields.io/badge/status-active-success.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-A Quran reading companion for the **CMU-Q Muslim Student Association**. Plan your khatmah with daily juz' and page targets for the standard 604-page Madani Mushaf—during Ramadan or on your own schedule.
+A Quran reading companion for the **CMU-Q Muslim Students Association**. Plan your khatmah with daily juz' and page targets for the standard 604-page Madani Mushaf—during Ramadan or on your own schedule.
 
 ## Features
 
@@ -75,5 +75,5 @@ curl http://localhost:8080/healthz
 
 ## Acknowledgments
 
-* CMU-Q Muslim Student Association
+* CMU-Q Muslim Students Association
 * Standard Madani Mushaf (604 pages) for juz'–page mapping

@@ -11,7 +11,7 @@ A Quran reading companion for the **CMU-Q Muslim Students Association**. Plan yo
 * **Dynamic scheduling:** Enter how many khatmahs you want to complete; the app distributes juz' and page ranges evenly across your plan length.
 * **Hijri date detection:** Uses `Intl.DateTimeFormat` (islamic-umalqura) to detect the current Ramadan day and show a year-round countdown to the next Ramadan.
 * **Plan day preview:** Outside Ramadan, browse and track progress against the 30-day Ramadan plan with a manual plan-day highlight.
-* **Hijri offset:** During Ramadan, adjust +/- for local moon sighting differences.
+* **Hijri offset:** During Ramadan, adjust +/- for local moon sighting differences. Outside Ramadan the same stepper drives the **plan day preview**, and in **My schedule** mode it advances the day before the plan starts.
 * **Mark as done:** Tap a day card to mark it complete. Progress persists in `localStorage` (separate keys per Ramadan year and per custom plan).
 * **Horizontal carousel:** Swipe or drag through days; auto-scrolls to the current day on load.
 * **Installable:** Add to home screen as a web app (PWA). Core app files work offline after first visit.
@@ -52,6 +52,8 @@ Health endpoint:
 ```bash
 curl http://localhost:8080/healthz
 ```
+
+> **Note:** The actual production deployment (reverse proxy, TLS, container orchestration) lives in the sibling repository [`cmuqmsa-infra`](../cmuqmsa-infra). The `Dockerfile`, `docker-compose.yml`, and `nginx.conf` in this repo are for local development and as the base image consumed by `cmuqmsa-infra`.
 
 ## Install as Web App
 

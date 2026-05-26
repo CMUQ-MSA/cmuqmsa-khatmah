@@ -1,8 +1,12 @@
 /**
  * Khatmah - Service Worker
  * Caches app shell for offline use and faster repeat loads.
+ *
+ * Strategy: stale-while-revalidate for assets in the ASSETS allowlist.
+ * IMPORTANT: bump CACHE_NAME whenever any file in ASSETS changes; the SWR
+ * fetch handler will not detect content changes without a version bump.
  */
-const CACHE_NAME = 'khatmah-v8';
+const CACHE_NAME = 'khatmah-v9';
 const ASSETS = [
   'index.html',
   'styles.css',
@@ -27,21 +31,44 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+function isCachableAsset(request) {
+  if (request.mode === 'navigate') return true;
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/^\//, '');
+  return ASSETS.includes(path);
+}
+
 self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
+  const req = e.request;
+  if (req.method !== 'GET') return;
+
+  const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (!isCachableAsset(req)) return;
 
-  const cacheKey = e.request.mode === 'navigate' ? 'index.html' : e.request;
+  const cacheKey = req.mode === 'navigate' ? 'index.html' : req;
 
-  e.respondWith(
-    fetch(e.request)
-      .then((response) => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(cacheKey, clone));
+  e.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(cacheKey);
+
+    const networkPromise = fetch(req)
+      .then((res) => {
+        if (res && res.ok && res.type === 'basic') {
+          cache.put(cacheKey, res.clone()).catch(() => {});
         }
-        return response;
+        return res;
       })
-      .catch(() => caches.match(cacheKey))
-  );
+      .catch(() => null);
+
+    e.waitUntil(networkPromise);
+
+    if (cached) return cached;
+    const fresh = await networkPromise;
+    if (fresh) return fresh;
+    return new Response('Offline', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  })());
 });

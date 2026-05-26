@@ -10,11 +10,16 @@ const PAGES_IN_QURAN = 604;
 const RAMADAN_MONTH = 9;
 const MIN_CUSTOM_DAYS = 1;
 const MAX_CUSTOM_DAYS = 365;
+const MIN_TARGET_KHATMAHS = 1;
+const MAX_TARGET_KHATMAHS = 10;
+const MIN_HIJRI_OFFSET = -29;
+const MAX_HIJRI_OFFSET = 29;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-const JUZ_PAGE_START = [
-    1, 22, 42, 62, 82, 102, 121, 142, 162, 182,
-    201, 222, 242, 262, 282, 302, 322, 342, 362, 382,
-    402, 422, 442, 462, 482, 502, 522, 542, 562, 582,
+const JUZ_PAGE_RANGES = [
+    [1, 21], [22, 41], [42, 61], [62, 81], [82, 101], [102, 120], [121, 141], [142, 161], [162, 181], [182, 200],
+    [201, 221], [222, 241], [242, 261], [262, 281], [282, 301], [302, 321], [322, 341], [342, 361], [362, 381], [382, 401],
+    [402, 421], [422, 441], [442, 461], [462, 481], [482, 501], [502, 521], [522, 541], [542, 561], [562, 581], [582, 604],
 ];
 
 const STORAGE_KEYS = {
@@ -55,6 +60,21 @@ let outsideBanner, headerSubtitle;
 let modeRamadanBtn, modeCustomBtn, customPanel, customStartInput, customFinishBy;
 let dayStepperRow, controlsBar, customPlanStatus;
 let customDurationDisplay, customDurationMinus, customDurationPlus;
+let srAnnouncer;
+
+/* ============ SR ANNOUNCER ============ */
+let lastAnnouncedMessage = '';
+let announceTimer = null;
+function announce(message) {
+    if (!srAnnouncer || !message) return;
+    if (message === lastAnnouncedMessage) return;
+    if (announceTimer) clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => {
+        srAnnouncer.textContent = '';
+        srAnnouncer.textContent = message;
+        lastAnnouncedMessage = message;
+    }, 250);
+}
 
 /* ============ HIJRI DATE ============ */
 function getHijriDate(date = new Date()) {
@@ -81,14 +101,22 @@ function getFormattedHijriDate() {
     }
 }
 
+let daysUntilRamadanCache = { iso: null, days: null };
 function getDaysUntilRamadan(fromDate = new Date()) {
-    for (let i = 0; i <= 400; i++) {
+    const iso = toISODate(fromDate);
+    if (daysUntilRamadanCache.iso === iso) return daysUntilRamadanCache.days;
+    let result = null;
+    for (let i = 0; i <= 365; i++) {
         const d = new Date(fromDate);
         d.setDate(d.getDate() + i);
         const h = getHijriDate(d);
-        if (h?.month === RAMADAN_MONTH && h.day === 1) return i;
+        if (h?.month === RAMADAN_MONTH && h.day === 1) {
+            result = i;
+            break;
+        }
     }
-    return null;
+    daysUntilRamadanCache = { iso, days: result };
+    return result;
 }
 
 function toISODate(date) {
@@ -99,20 +127,39 @@ function toISODate(date) {
 }
 
 function parseISODate(iso) {
+    if (typeof iso !== 'string' || !ISO_DATE_RE.test(iso)) return null;
     const [y, m, d] = iso.split('-').map(Number);
-    return new Date(y, m - 1, d);
+    const date = new Date(y, m - 1, d);
+    if (Number.isNaN(date.getTime())) return null;
+    if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+    return date;
+}
+
+function isValidISODate(iso) {
+    return parseISODate(iso) !== null;
 }
 
 function daysBetween(startIso, endDate = new Date()) {
     const start = parseISODate(startIso);
+    if (!start) return 0;
     start.setHours(0, 0, 0, 0);
     const end = new Date(endDate);
     end.setHours(0, 0, 0, 0);
-    return Math.floor((end - start) / 86400000);
+    return Math.round((end - start) / 86400000);
 }
 
 function defaultCustomStartDate() {
     return toISODate(new Date());
+}
+
+function parseIntSafe(value, fallback) {
+    if (value == null) return fallback;
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function clampInt(value, lo, hi) {
+    return Math.max(lo, Math.min(hi, value));
 }
 
 /* ============ MODE HELPERS ============ */
@@ -128,8 +175,18 @@ function ramadanCompletedKey(year) {
     return `khatmah_completed_ramadan_${year}`;
 }
 
+function ramadanPreviewCompletedKey(year) {
+    return `khatmah_completed_ramadan_preview_${year}`;
+}
+
 function customCompletedKey() {
+    if (!isValidISODate(appState.customStartDate)) return null;
     return `khatmah_completed_custom_${appState.customStartDate}_${appState.customDurationDays}`;
+}
+
+function getCurrentHijriMonth() {
+    const hijri = getHijriDate();
+    return hijri?.month ?? null;
 }
 
 function getRamadanYear() {
@@ -137,28 +194,40 @@ function getRamadanYear() {
     return hijri?.year ?? new Date().getFullYear();
 }
 
+function activeCompletedKey() {
+    if (isRamadanMode()) {
+        const inRamadanNow = getCurrentHijriMonth() === RAMADAN_MONTH;
+        return inRamadanNow
+            ? ramadanCompletedKey(getRamadanYear())
+            : ramadanPreviewCompletedKey(getRamadanYear());
+    }
+    return customCompletedKey();
+}
+
+let activeCompletedKeyMemo = null;
+
 function loadCompletedDays() {
+    const len = getScheduleLength();
+    activeCompletedKeyMemo = activeCompletedKey();
     try {
-        if (isRamadanMode()) {
-            const key = ramadanCompletedKey(getRamadanYear());
-            const raw = localStorage.getItem(key);
-            if (raw) {
-                completedDays = JSON.parse(raw).filter((n) => n >= 1 && n <= RAMADAN_DAYS);
-                return;
-            }
+        const key = activeCompletedKeyMemo;
+        if (!key) {
+            completedDays = [];
+            return;
+        }
+        const raw = localStorage.getItem(key);
+        if (raw) {
+            completedDays = JSON.parse(raw).filter((n) => Number.isInteger(n) && n >= 1 && n <= len);
+            return;
+        }
+        if (isRamadanMode() && getCurrentHijriMonth() === RAMADAN_MONTH) {
             const legacy = localStorage.getItem(STORAGE_KEYS.completedDaysLegacy);
             if (legacy) {
-                completedDays = JSON.parse(legacy).filter((n) => n >= 1 && n <= RAMADAN_DAYS);
+                completedDays = JSON.parse(legacy).filter((n) => Number.isInteger(n) && n >= 1 && n <= RAMADAN_DAYS);
                 localStorage.setItem(key, JSON.stringify(completedDays));
                 localStorage.removeItem(STORAGE_KEYS.completedDaysLegacy);
                 return;
             }
-        } else {
-            const raw = localStorage.getItem(customCompletedKey());
-            completedDays = raw
-                ? JSON.parse(raw).filter((n) => n >= 1 && n <= getScheduleLength())
-                : [];
-            return;
         }
         completedDays = [];
     } catch (e) {
@@ -168,11 +237,9 @@ function loadCompletedDays() {
 
 function saveCompletedDays() {
     try {
-        if (isRamadanMode()) {
-            localStorage.setItem(ramadanCompletedKey(getRamadanYear()), JSON.stringify(completedDays));
-        } else {
-            localStorage.setItem(customCompletedKey(), JSON.stringify(completedDays));
-        }
+        const key = activeCompletedKey();
+        if (!key) return;
+        localStorage.setItem(key, JSON.stringify(completedDays));
     } catch (e) {}
 }
 
@@ -214,55 +281,77 @@ function updateCurrentDay() {
 }
 
 /* ============ SCHEDULE CALCULATION ============ */
+function pageToJuz(page) {
+    const p = clampInt(page, 1, PAGES_IN_QURAN);
+    for (let i = 0; i < JUZ_PAGE_RANGES.length; i++) {
+        const [start, end] = JUZ_PAGE_RANGES[i];
+        if (p >= start && p <= end) return i + 1;
+    }
+    return JUZ_PER_KHATMAH;
+}
+
 function buildSchedule(totalDays) {
-    const totalJuz = JUZ_PER_KHATMAH * appState.targetKhatmahs;
+    const totalPagesAll = PAGES_IN_QURAN * appState.targetKhatmahs;
     const schedule = [];
 
+    let prevCumEnd = 0;
     for (let d = 1; d <= totalDays; d++) {
-        const juzStart = Math.floor((d - 1) * totalJuz / totalDays) + 1;
-        const juzEnd = Math.max(juzStart, Math.floor(d * totalJuz / totalDays));
-        const khatmahNum = Math.ceil(juzEnd / JUZ_PER_KHATMAH);
-        const isMilestone = juzEnd % JUZ_PER_KHATMAH === 0;
+        let cumEnd = Math.floor(d * totalPagesAll / totalDays);
+        if (cumEnd <= prevCumEnd) cumEnd = prevCumEnd + 1;
+        if (cumEnd > totalPagesAll) cumEnd = totalPagesAll;
+
+        const pageStartAbs = prevCumEnd + 1;
+        const pageEndAbs = cumEnd;
+
+        const khatmahStart = Math.ceil(pageStartAbs / PAGES_IN_QURAN);
+        const khatmahEnd = Math.ceil(pageEndAbs / PAGES_IN_QURAN);
+        const isMilestone = pageEndAbs % PAGES_IN_QURAN === 0;
+
+        const pageStartWithin = ((pageStartAbs - 1) % PAGES_IN_QURAN) + 1;
+        const pageEndWithin = ((pageEndAbs - 1) % PAGES_IN_QURAN) + 1;
+        const juzStart = pageToJuz(pageStartWithin);
+        const juzEnd = pageToJuz(pageEndWithin);
 
         schedule.push({
             day: d,
+            pageStart: pageStartWithin,
+            pageEnd: pageEndWithin,
             juzStart,
             juzEnd,
-            juzCount: juzEnd - juzStart + 1,
-            khatmahNumber: khatmahNum,
+            khatmahStart,
+            khatmahEnd,
+            khatmahNumber: khatmahEnd,
             isMilestone,
         });
+        prevCumEnd = cumEnd;
     }
     return schedule;
 }
 
-function juzNum(cumulative) {
-    return ((cumulative - 1) % JUZ_PER_KHATMAH) + 1;
+function formatJuzRange(row) {
+    if (row.khatmahStart !== row.khatmahEnd) {
+        return `Juz' ${row.juzStart}-${JUZ_PER_KHATMAH}, 1-${row.juzEnd}`;
+    }
+    return row.juzStart === row.juzEnd ? `Juz' ${row.juzStart}` : `Juz' ${row.juzStart}-${row.juzEnd}`;
 }
 
-function formatJuzRange(juzStart, juzEnd) {
-    const s = juzNum(juzStart);
-    const e = juzNum(juzEnd);
-    return s === e ? `Juz' ${s}` : `Juz' ${s}-${e}`;
+function formatPageRange(row) {
+    if (row.khatmahStart !== row.khatmahEnd) {
+        return `pp.${row.pageStart}-${PAGES_IN_QURAN}, 1-${row.pageEnd}`;
+    }
+    return row.pageStart === row.pageEnd ? `p.${row.pageStart}` : `pp.${row.pageStart}-${row.pageEnd}`;
 }
 
-function juzToPageRange(juz) {
-    const idx = juz - 1;
-    const start = JUZ_PAGE_START[idx];
-    const end = juz < 30 ? JUZ_PAGE_START[idx + 1] - 1 : PAGES_IN_QURAN;
-    return [start, end];
-}
-
-function formatPageRange(juzStart, juzEnd) {
-    const s = juzNum(juzStart);
-    const e = juzNum(juzEnd);
-    const [pStart] = juzToPageRange(s);
-    const [, pEnd] = juzToPageRange(e);
-    return pStart === pEnd ? `p.${pStart}` : `pp.${pStart}-${pEnd}`;
+function formatKhatmahLabel(row) {
+    if (row.khatmahStart !== row.khatmahEnd) {
+        return `Khatmah ${row.khatmahStart}\u2192${row.khatmahEnd}`;
+    }
+    return `Khatmah ${row.khatmahNumber}`;
 }
 
 function formatFinishDate() {
     const start = parseISODate(appState.customStartDate);
+    if (!start) return '—';
     start.setDate(start.getDate() + appState.customDurationDays - 1);
     return start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -270,28 +359,32 @@ function formatFinishDate() {
 /* ============ PERSISTENCE ============ */
 function loadState() {
     try {
-        const k = localStorage.getItem(STORAGE_KEYS.targetKhatmahs);
-        if (k != null) appState.targetKhatmahs = Math.max(1, Math.min(10, parseInt(k, 10)));
+        appState.targetKhatmahs = clampInt(
+            parseIntSafe(localStorage.getItem(STORAGE_KEYS.targetKhatmahs), appState.targetKhatmahs),
+            MIN_TARGET_KHATMAHS, MAX_TARGET_KHATMAHS,
+        );
 
         const mode = localStorage.getItem(STORAGE_KEYS.scheduleMode);
         if (mode === 'ramadan' || mode === 'custom') appState.scheduleMode = mode;
 
-        const plan = localStorage.getItem(STORAGE_KEYS.planDay);
-        if (plan != null) appState.planDay = Math.max(1, Math.min(30, parseInt(plan, 10)));
+        appState.planDay = clampInt(
+            parseIntSafe(localStorage.getItem(STORAGE_KEYS.planDay), appState.planDay),
+            1, RAMADAN_DAYS,
+        );
 
-        const off = localStorage.getItem(STORAGE_KEYS.hijriOffset);
-        if (off != null) appState.hijriOffset = Math.max(-29, Math.min(29, parseInt(off, 10)));
+        appState.hijriOffset = clampInt(
+            parseIntSafe(localStorage.getItem(STORAGE_KEYS.hijriOffset), appState.hijriOffset),
+            MIN_HIJRI_OFFSET, MAX_HIJRI_OFFSET,
+        );
 
         const start = localStorage.getItem(STORAGE_KEYS.customStartDate);
-        appState.customStartDate = start || defaultCustomStartDate();
+        appState.customStartDate = isValidISODate(start) ? start : defaultCustomStartDate();
 
-        const dur = localStorage.getItem(STORAGE_KEYS.customDuration);
-        if (dur != null) {
-            appState.customDurationDays = clampCustomDuration(parseInt(dur, 10));
-        }
+        appState.customDurationDays = clampCustomDuration(
+            parseIntSafe(localStorage.getItem(STORAGE_KEYS.customDuration), appState.customDurationDays),
+        );
 
-        const hijri = getHijriDate();
-        if (hijri?.month === RAMADAN_MONTH) appState.scheduleMode = 'ramadan';
+        if (getCurrentHijriMonth() === RAMADAN_MONTH) appState.scheduleMode = 'ramadan';
 
         loadCompletedDays();
     } catch (e) {}
@@ -311,13 +404,18 @@ function saveState() {
 
 /* ============ STATE ACTIONS ============ */
 function setTargetKhatmahs(value) {
-    appState.targetKhatmahs = Math.max(1, Math.min(10, value));
+    const prev = appState.targetKhatmahs;
+    appState.targetKhatmahs = clampInt(value, MIN_TARGET_KHATMAHS, MAX_TARGET_KHATMAHS);
+    if (appState.targetKhatmahs !== prev) {
+        announce(`${appState.targetKhatmahs} khatmah${appState.targetKhatmahs === 1 ? '' : 's'}`);
+    }
     saveState();
     render();
 }
 
 function setScheduleMode(mode) {
     if (mode !== 'ramadan' && mode !== 'custom') return;
+    if (appState.scheduleMode === mode) return;
     appState.scheduleMode = mode;
     appState.customDayOverride = null;
     loadCompletedDays();
@@ -326,20 +424,22 @@ function setScheduleMode(mode) {
     saveState();
     render();
     scrollToDay(currentDay);
+    announce(mode === 'ramadan' ? 'Ramadan plan' : 'Custom schedule');
 }
 
 function adjustDayStepper(delta) {
     const len = getScheduleLength();
+    const prevDay = currentDay;
 
     if (isRamadanMode()) {
         if (inRamadan) {
-            appState.hijriOffset = Math.max(-29, Math.min(29, appState.hijriOffset + delta));
+            appState.hijriOffset = clampInt(appState.hijriOffset + delta, MIN_HIJRI_OFFSET, MAX_HIJRI_OFFSET);
         } else {
-            appState.planDay = Math.max(1, Math.min(RAMADAN_DAYS, appState.planDay + delta));
+            appState.planDay = clampInt(appState.planDay + delta, 1, RAMADAN_DAYS);
         }
     } else if (customBeforeStart) {
         const base = appState.customDayOverride ?? 1;
-        appState.customDayOverride = Math.max(1, Math.min(len, base + delta));
+        appState.customDayOverride = clampInt(base + delta, 1, len);
     } else {
         return;
     }
@@ -349,21 +449,26 @@ function adjustDayStepper(delta) {
     saveState();
     render();
     scrollToDay(currentDay);
+    if (currentDay !== prevDay) announce(`Day ${currentDay}`);
 }
 
 function setCustomStartDate(iso) {
-    appState.customStartDate = iso;
+    const valid = isValidISODate(iso);
+    appState.customStartDate = valid ? iso : defaultCustomStartDate();
     appState.customDayOverride = null;
+    if (!valid && customStartInput) customStartInput.value = appState.customStartDate;
     loadCompletedDays();
     updateCurrentDay();
     viewingDay = currentDay;
     saveState();
     render();
     scrollToDay(currentDay);
+    announce(valid ? `Start date set to ${appState.customStartDate}` : 'Invalid date; reset to default');
 }
 
 function clampCustomDuration(days) {
-    return Math.max(MIN_CUSTOM_DAYS, Math.min(MAX_CUSTOM_DAYS, days));
+    if (!Number.isFinite(days)) return MIN_CUSTOM_DAYS;
+    return clampInt(days, MIN_CUSTOM_DAYS, MAX_CUSTOM_DAYS);
 }
 
 function adjustCustomDuration(delta) {
@@ -381,6 +486,7 @@ function setCustomDuration(days) {
     saveState();
     render();
     scrollToDay(currentDay);
+    announce(`${next} day${next === 1 ? '' : 's'}`);
 }
 
 function toggleDayComplete(day) {
@@ -388,6 +494,7 @@ function toggleDayComplete(day) {
     if (day < 1 || day > len) return;
 
     const idx = completedDays.indexOf(day);
+    const willBeComplete = idx < 0;
     if (idx >= 0) {
         completedDays.splice(idx, 1);
     } else {
@@ -397,6 +504,7 @@ function toggleDayComplete(day) {
     if (navigator.vibrate) navigator.vibrate(50);
     saveState();
     render();
+    announce(`Day ${day} ${willBeComplete ? 'completed' : 'uncompleted'}`);
 }
 
 function isDayStepperDisabled() {
@@ -423,16 +531,17 @@ function renderProgress() {
     progressBarFill.style.width = `${pct}%`;
 }
 
+let lastHeaderSubtitle = null;
+
 function renderControls() {
     hijriDayDisplay.textContent = currentDay;
     khatmahInput.textContent = appState.targetKhatmahs;
 
+    khatmahMinus.disabled = appState.targetKhatmahs <= MIN_TARGET_KHATMAHS;
+    khatmahPlus.disabled = appState.targetKhatmahs >= MAX_TARGET_KHATMAHS;
+
     if (isRamadanMode()) {
-        if (inRamadan) {
-            dayStepperLabel.textContent = 'Ramadan day';
-        } else {
-            dayStepperLabel.textContent = 'Plan day';
-        }
+        dayStepperLabel.textContent = inRamadan ? 'Ramadan day' : 'Plan day';
     } else {
         dayStepperLabel.textContent = 'Day';
     }
@@ -440,21 +549,22 @@ function renderControls() {
     const stepperDisabled = isDayStepperDisabled();
     hijriMinus.disabled = stepperDisabled;
     hijriPlus.disabled = stepperDisabled;
-    hijriMinus.classList.toggle('opacity-40', stepperDisabled);
-    hijriPlus.classList.toggle('opacity-40', stepperDisabled);
 
-    headerSubtitle.textContent = isRamadanMode()
+    const subtitle = isRamadanMode()
         ? 'Finish the Quran this Ramadan'
         : 'Your Quran reading plan';
-    carousel.setAttribute('aria-label', 'Daily reading schedule');
-
-    renderModeToggle();
+    if (subtitle !== lastHeaderSubtitle) {
+        headerSubtitle.textContent = subtitle;
+        lastHeaderSubtitle = subtitle;
+    }
 
     dayStepperRow.classList.toggle('is-hidden', !isRamadanMode());
     controlsBar.classList.toggle('controls-bar--custom-only', !isRamadanMode());
 
     if (!isRamadanMode()) {
-        customStartInput.value = appState.customStartDate;
+        if (customStartInput.value !== appState.customStartDate) {
+            customStartInput.value = appState.customStartDate;
+        }
         customFinishBy.textContent = formatFinishDate();
         customDurationDisplay.textContent = appState.customDurationDays;
         customDurationMinus.disabled = appState.customDurationDays <= MIN_CUSTOM_DAYS;
@@ -483,112 +593,153 @@ function renderControls() {
     }
 }
 
+let lastStructuralKey = null;
+
 function renderCarousel() {
     const schedule = buildSchedule(getScheduleLength());
-    carouselInner.innerHTML = schedule
-        .map((row) => {
-            const juzLabel = formatJuzRange(row.juzStart, row.juzEnd);
-            const pageLabel = formatPageRange(row.juzStart, row.juzEnd);
-            const isCurrent = row.day === currentDay;
+    const structuralKey = `${appState.scheduleMode}|${schedule.length}|${appState.targetKhatmahs}`;
+
+    if (structuralKey !== lastStructuralKey) {
+        carouselInner.innerHTML = schedule.map(buildCardHTML).join('');
+        lastStructuralKey = structuralKey;
+    } else {
+        for (const row of schedule) {
+            const card = carouselInner.querySelector(`[data-day="${row.day}"]`);
+            if (!card) continue;
             const isComplete = completedDays.includes(row.day);
+            card.classList.toggle('current-day', row.day === currentDay);
+            card.classList.toggle('completed', isComplete);
+            card.setAttribute('aria-pressed', String(isComplete));
+        }
+    }
+}
 
-            const cardClasses = [
-                'day-card carousel-card',
-                isCurrent ? 'current-day' : '',
-                isComplete ? 'completed' : '',
-            ]
-                .filter(Boolean)
-                .join(' ');
+function buildCardHTML(row) {
+    const juzLabel = formatJuzRange(row);
+    const pageLabel = formatPageRange(row);
+    const khatmahLabel = formatKhatmahLabel(row);
+    const isCurrent = row.day === currentDay;
+    const isComplete = completedDays.includes(row.day);
+    const milestone = row.isMilestone ? ' \u2713' : '';
 
-            const check = isComplete ? '<span class="text-green-400 text-xl" aria-hidden="true">✓</span>' : '';
-            const dayClass = isCurrent ? 'text-cmu-red' : 'text-slate-300';
-            const milestone = row.isMilestone ? ' ✓' : '';
+    const cardClasses = ['day-card carousel-card'];
+    if (isCurrent) cardClasses.push('current-day');
+    if (isComplete) cardClasses.push('completed');
 
-            return [
-                '<article class="', cardClasses, '" data-day="', row.day, '" role="button" tabindex="0"',
-                ' aria-label="Day ', row.day, ': ', juzLabel, ' ', pageLabel, '">',
-                '<div class="flex justify-between items-start mb-3">',
-                '<span class="text-lg font-bold ', dayClass, '">Day ', row.day, '</span>', check,
-                '</div>',
-                '',
-                '<div class="text-cmu-red font-semibold mb-1">', juzLabel, '</div>',
-                '<div class="text-sm text-slate-500">', pageLabel, '</div>',
-                '<div class="mt-2 text-xs text-slate-500">Khatmah ', row.khatmahNumber, milestone, '</div>',
-                '</article>',
-            ].join('');
-        })
-        .join('');
+    return [
+        '<article class="', cardClasses.join(' '), '" data-day="', row.day, '" role="button" tabindex="0"',
+        ' aria-pressed="', isComplete, '"',
+        ' aria-label="Day ', row.day, ': ', juzLabel, ' ', pageLabel, '">',
+            '<div class="day-card-header">',
+                '<span class="day-card-day-num">Day ', row.day, '</span>',
+                '<span class="day-card-check" aria-hidden="true">\u2713</span>',
+            '</div>',
+            '<div class="day-card-juz">', juzLabel, '</div>',
+            '<div class="day-card-pages">', pageLabel, '</div>',
+            '<div class="day-card-khatmah">', khatmahLabel, milestone, '</div>',
+        '</article>',
+    ].join('');
+}
 
+function setupCarouselInteractions() {
     const TAP_THRESHOLD = 10;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchHandled = false;
 
-    carouselInner.querySelectorAll('[data-day]').forEach((el) => {
-        const day = parseInt(el.dataset.day, 10);
-        let touchHandled = false;
+    carouselInner.addEventListener('click', (e) => {
+        if (touchHandled) {
+            touchHandled = false;
+            return;
+        }
+        if (dragState.wasDragged) {
+            dragState.wasDragged = false;
+            return;
+        }
+        const card = e.target.closest('[data-day]');
+        if (!card || !carouselInner.contains(card)) return;
+        const day = parseInt(card.dataset.day, 10);
+        if (Number.isFinite(day)) toggleDayComplete(day);
+    });
 
-        const handleTap = () => toggleDayComplete(day);
+    carouselInner.addEventListener('touchstart', (e) => {
+        const t = e.touches[0];
+        touchStartX = t.clientX;
+        touchStartY = t.clientY;
+    }, { passive: true });
 
-        el.addEventListener('click', () => {
-            if (touchHandled) {
-                touchHandled = false;
-                return;
-            }
-            handleTap();
-        });
+    carouselInner.addEventListener('touchend', (e) => {
+        const card = e.target.closest('[data-day]');
+        if (!card || !carouselInner.contains(card)) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - touchStartX;
+        const dy = t.clientY - touchStartY;
+        if (Math.hypot(dx, dy) <= TAP_THRESHOLD) {
+            touchHandled = true;
+            e.preventDefault();
+            const day = parseInt(card.dataset.day, 10);
+            if (Number.isFinite(day)) toggleDayComplete(day);
+        }
+    }, { passive: false });
 
-        let touchStartX = 0;
-        el.addEventListener('touchstart', (e) => {
-            touchStartX = e.touches[0].clientX;
-        }, { passive: true });
-        el.addEventListener('touchend', (e) => {
-            const touchEndX = e.changedTouches[0].clientX;
-            if (Math.abs(touchEndX - touchStartX) <= TAP_THRESHOLD) {
-                touchHandled = true;
-                e.preventDefault();
-                handleTap();
-            }
-        }, { passive: false });
-
-        el.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleTap();
-            }
-        });
+    carouselInner.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const card = e.target.closest('[data-day]');
+        if (!card || !carouselInner.contains(card)) return;
+        e.preventDefault();
+        const day = parseInt(card.dataset.day, 10);
+        if (Number.isFinite(day)) toggleDayComplete(day);
     });
 }
 
 function render() {
+    const expectedKey = activeCompletedKey();
+    if (expectedKey !== activeCompletedKeyMemo) {
+        loadCompletedDays();
+    }
     updateCurrentDay();
+    viewingDay = clampInt(viewingDay, 1, getScheduleLength());
+    renderModeToggle();
     renderProgress();
     renderControls();
     renderCarousel();
 }
 
 /* ============ SCROLL ============ */
-function scrollToDay(day) {
+function scrollToDay(day, { smooth = true } = {}) {
     requestAnimationFrame(() => {
         const card = carouselInner.querySelector(`[data-day="${day}"]`);
         if (card) {
             const scrollLeft = card.offsetLeft - carousel.offsetWidth / 2 + card.offsetWidth / 2;
-            carousel.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+            carousel.scrollTo({ left: scrollLeft, behavior: smooth ? 'smooth' : 'auto' });
         }
     });
 }
 
 /* ============ DRAG TO SCROLL (Desktop) ============ */
+const dragState = { wasDragged: false };
+
 function setupDragScroll() {
     let isDown = false;
     let startX;
     let scrollLeft;
+    let movedPx;
+    const DRAG_THRESHOLD = 5;
 
     carousel.addEventListener('mousedown', (e) => {
         isDown = true;
+        movedPx = 0;
+        dragState.wasDragged = false;
         carousel.classList.add('cursor-grabbing');
         startX = e.pageX - carousel.offsetLeft;
         scrollLeft = carousel.scrollLeft;
     });
 
     carousel.addEventListener('mouseleave', () => {
+        if (isDown && movedPx > DRAG_THRESHOLD) {
+            dragState.wasDragged = true;
+            setTimeout(() => { dragState.wasDragged = false; }, 0);
+        }
         isDown = false;
         carousel.classList.remove('cursor-grabbing');
     });
@@ -596,6 +747,10 @@ function setupDragScroll() {
     carousel.addEventListener('mouseup', () => {
         isDown = false;
         carousel.classList.remove('cursor-grabbing');
+        if (movedPx > DRAG_THRESHOLD) {
+            dragState.wasDragged = true;
+            setTimeout(() => { dragState.wasDragged = false; }, 0);
+        }
     });
 
     carousel.addEventListener('mousemove', (e) => {
@@ -603,6 +758,7 @@ function setupDragScroll() {
         e.preventDefault();
         const x = e.pageX - carousel.offsetLeft;
         const walk = (x - startX) * 1.2;
+        movedPx = Math.abs(x - startX);
         carousel.scrollLeft = scrollLeft - walk;
     });
 }
@@ -648,6 +804,7 @@ function init() {
     customDurationDisplay = document.getElementById('custom-duration-display');
     customDurationMinus = document.getElementById('custom-duration-minus');
     customDurationPlus = document.getElementById('custom-duration-plus');
+    srAnnouncer = document.getElementById('sr-announcer');
 
     loadState();
     updateCurrentDay();
@@ -665,9 +822,10 @@ function init() {
 
     setupDragScroll();
     setupKeyboardNav();
+    setupCarouselInteractions();
 
     render();
-    scrollToDay(currentDay);
+    scrollToDay(currentDay, { smooth: false });
 }
 
-document.addEventListener('DOMContentLoaded', init);
+init();
